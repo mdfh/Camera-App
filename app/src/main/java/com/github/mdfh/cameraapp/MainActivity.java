@@ -6,11 +6,13 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
 import android.view.View;
-import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.RadioButton;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ToggleButton;
 
 import com.github.mdfh.R;
 
@@ -19,62 +21,71 @@ import com.github.mdfh.R;
  */
 public class MainActivity extends Activity  {
 
-    private boolean mRecording;
+    enum CameraType
+    {
+        FRONT, BACK
+    }
+
     private boolean mHandlingEvent;
-
-    private RadioButton mFrontRadioButton;
-    private RadioButton mBackRadioButton;
-    private Button mRecordingButton;
-
+    private ImageButton mChangeCameraBtn;
+    private ToggleButton mRecordingButton;
+    private FrameLayout preview;
     private Camera mCamera;
     private CameraPreview mPreview;
-
+    private CameraType cameraType = CameraType.FRONT;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mFrontRadioButton = (RadioButton) findViewById(R.id.front_camera_radio_button);
-        if (!Util.isCameraExist(Camera.CameraInfo.CAMERA_FACING_FRONT)) {
-            mFrontRadioButton.setVisibility(View.GONE);
-            mFrontRadioButton.setChecked(false);
-        }
-        mBackRadioButton = (RadioButton) findViewById(R.id.back_camera_radio_button);
-        if (!Util.isCameraExist(Camera.CameraInfo.CAMERA_FACING_BACK)) {
-            mBackRadioButton.setVisibility(View.GONE);
-            mBackRadioButton.setChecked(false);
-        }
+        preview = (FrameLayout) findViewById(R.id.camera_preview);
 
-        mRecordingButton = (Button) findViewById(R.id.recording_button);
-        mRecordingButton.setOnClickListener(new View.OnClickListener() {
+        mChangeCameraBtn = (ImageButton) findViewById(R.id.change_camera_btn);
+        mChangeCameraBtn.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View v) {
-                if (mRecording) {
+            public void onClick(View view) {
+                if(cameraType == CameraType.FRONT)
+                    cameraType = CameraType.BACK;
+                else
+                    cameraType = CameraType.FRONT;
+
+                addOrChangeCamera();
+            }
+        });
+
+        mRecordingButton = (ToggleButton) findViewById(R.id.recording_button);
+        mRecordingButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                if (b) {
+                    mChangeCameraBtn.setEnabled(true);
                     stopRecording();
                 } else {
+                    mChangeCameraBtn.setEnabled(false);
                     startRecording();
                 }
             }
         });
 
         if (!Util.isCameraExist(this)) {
-            mFrontRadioButton.setVisibility(View.GONE);
-            mBackRadioButton.setVisibility(View.GONE);
-            mRecordingButton.setVisibility(View.GONE);
+            mChangeCameraBtn.setEnabled(false);
+            mRecordingButton.setEnabled(false);
 
             TextView noCameraTextView = (TextView) findViewById(R.id.no_camera_text_view);
             noCameraTextView.setVisibility(View.VISIBLE);
         }
 
+        addOrChangeCamera();
+    }
+
+    private void addOrChangeCamera() {
         // Create an instance of Camera
         mCamera = Util.getCameraInstance(getCameraId());
-
         // Create our Preview view and set it as the content of our activity.
         mPreview = new CameraPreview(this, mCamera);
-        FrameLayout preview = (FrameLayout) findViewById(R.id.camera_preview);
+        preview.removeAllViews();
         preview.addView(mPreview);
-
     }
 
     private void startRecording() {
@@ -83,7 +94,6 @@ public class MainActivity extends Activity  {
             ResultReceiver receiver = new ResultReceiver(new Handler()) {
                 @Override
                 protected void onReceiveResult(int resultCode, Bundle resultData) {
-                    setRecording(true);
                     handleStartRecordingResult(resultCode, resultData);
                     mHandlingEvent = false;
                 }
@@ -94,7 +104,7 @@ public class MainActivity extends Activity  {
 
     private int getCameraId()
     {
-        if (mFrontRadioButton.isChecked()) {
+        if (cameraType == CameraType.FRONT) {
             return Camera.CameraInfo.CAMERA_FACING_FRONT;
         }
         return Camera.CameraInfo.CAMERA_FACING_BACK;
@@ -106,22 +116,11 @@ public class MainActivity extends Activity  {
             ResultReceiver receiver = new ResultReceiver(new Handler()) {
                 @Override
                 protected void onReceiveResult(int resultCode, Bundle resultData) {
-                    setRecording(false);
                     handleStopRecordingResult(resultCode, resultData);
                     mHandlingEvent = false;
                 }
             };
             CameraService.startToStopRecording(this, receiver);
-        }
-    }
-
-    private void setRecording(boolean recording) {
-        if (recording) {
-            mRecording = true;
-            mRecordingButton.setText(R.string.stop_recording);
-        } else {
-            mRecording = false;
-            mRecordingButton.setText(R.string.start_recording);
         }
     }
 
@@ -131,7 +130,6 @@ public class MainActivity extends Activity  {
         } else {
             // start recording failed.
             Toast.makeText(this, "Start recording failed...", Toast.LENGTH_SHORT).show();
-            setRecording(false);
         }
     }
 
@@ -144,7 +142,6 @@ public class MainActivity extends Activity  {
             Toast.makeText(this, "Stop recording failed...", Toast.LENGTH_SHORT).show();
         } else {
             Toast.makeText(this, "Recording failed...", Toast.LENGTH_SHORT).show();
-            setRecording(true);
         }
     }
 }
