@@ -9,7 +9,6 @@ import android.view.View;
 import android.widget.CompoundButton;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
-import android.widget.RadioButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
@@ -50,7 +49,7 @@ public class MainActivity extends Activity  {
                 else
                     cameraType = CameraType.FRONT;
 
-                addOrChangeCamera();
+                changeCamera();
             }
         });
 
@@ -76,10 +75,10 @@ public class MainActivity extends Activity  {
             noCameraTextView.setVisibility(View.VISIBLE);
         }
 
-        addOrChangeCamera();
+        changeCamera();
     }
 
-    private void addOrChangeCamera() {
+    private void changeCamera() {
         // Create an instance of Camera
         mCamera = Util.getCameraInstance(getCameraId());
         // Create our Preview view and set it as the content of our activity.
