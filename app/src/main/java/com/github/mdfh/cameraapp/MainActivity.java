@@ -5,6 +5,7 @@ import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
+import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.CompoundButton;
 import android.widget.FrameLayout;
@@ -18,7 +19,8 @@ import com.github.mdfh.R;
 /**
  * TODO add keyguard when recording. (Cannot leave app when it is recording)
  */
-public class MainActivity extends Activity  {
+public class MainActivity extends AppCompatActivity
+{
 
     enum CameraType
     {
@@ -31,7 +33,7 @@ public class MainActivity extends Activity  {
     private FrameLayout preview;
     private Camera mCamera;
     private CameraPreview mPreview;
-    private CameraType cameraType = CameraType.FRONT;
+    private CameraType cameraType = CameraType.BACK;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,6 +56,9 @@ public class MainActivity extends Activity  {
         });
 
         mRecordingButton = (ToggleButton) findViewById(R.id.recording_button);
+        mRecordingButton.setText(null);
+        mRecordingButton.setTextOn(null);
+        mRecordingButton.setTextOff(null);
         mRecordingButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
@@ -85,6 +90,7 @@ public class MainActivity extends Activity  {
         mPreview = new CameraPreview(this, mCamera);
         preview.removeAllViews();
         preview.addView(mPreview);
+        preview.invalidate();
     }
 
     private void startRecording() {
