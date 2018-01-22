@@ -24,7 +24,7 @@ class CameraPreview @Inject constructor(private val mContext: Context) : Surface
     private var isPreviewRunning: Boolean = false
     private var mSurfaceHolder: SurfaceHolder? = null
 
-    private lateinit var mCamera: Camera
+    private var mCamera: Camera? = null
 
     fun init(camera: Camera)
     {
@@ -39,8 +39,8 @@ class CameraPreview @Inject constructor(private val mContext: Context) : Surface
 
     fun previewCamera() {
         try {
-            mCamera.setPreviewDisplay(mSurfaceHolder)
-            mCamera.startPreview()
+            mCamera!!.setPreviewDisplay(mSurfaceHolder)
+            mCamera!!.startPreview()
             isPreviewRunning = true
         } catch (e: Exception) {
             Log.d(TAG, "Cannot start preview", e)
@@ -56,7 +56,7 @@ class CameraPreview @Inject constructor(private val mContext: Context) : Surface
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         try {
-            mCamera.stopPreview()
+            mCamera!!.stopPreview()
             isPreviewRunning = false
         } catch (e: Exception) {
             e.printStackTrace()
@@ -66,15 +66,15 @@ class CameraPreview @Inject constructor(private val mContext: Context) : Surface
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         if (isPreviewRunning) {
-            mCamera.stopPreview()
+            mCamera!!.stopPreview()
         }
         Log.d(TAG, "Test")
-        val parameters = mCamera.parameters
+        val parameters = mCamera!!.parameters
         val display = (mContext.getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay
 
         if (display.rotation == Surface.ROTATION_0) {
             parameters.setPreviewSize(height, width)
-            mCamera.setDisplayOrientation(90)
+            mCamera!!.setDisplayOrientation(90)
         }
 
         if (display.rotation == Surface.ROTATION_90) {
@@ -87,14 +87,18 @@ class CameraPreview @Inject constructor(private val mContext: Context) : Surface
 
         if (display.rotation == Surface.ROTATION_270) {
             parameters.setPreviewSize(width, height)
-            mCamera.setDisplayOrientation(180)
+            mCamera!!.setDisplayOrientation(180)
         }
 
-        mCamera.parameters = parameters
+        mCamera!!.parameters = parameters
         previewCamera()
     }
 
     companion object {
         private val TAG = "CameraPreview"
+    }
+
+    fun getCamera(): Camera? {
+        return mCamera
     }
 }

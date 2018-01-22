@@ -4,9 +4,11 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.graphics.Point
 import android.hardware.Camera
 import android.media.CamcorderProfile
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.ResultReceiver
@@ -21,6 +23,8 @@ import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 import javax.inject.Inject
+import android.util.DisplayMetrics
+
 
 class CameraService : DaggerService() {
 
@@ -31,6 +35,8 @@ class CameraService : DaggerService() {
 
     @Inject
     lateinit var mPreview: CameraPreview
+
+    @Inject lateinit var context: Context
 
     /**
      * Used to take picture.
@@ -76,7 +82,9 @@ class CameraService : DaggerService() {
 
         val cameraId = intent.getIntExtra(SELECTED_CAMERA_FOR_RECORDING,
                 Camera.CameraInfo.CAMERA_FACING_BACK)
-        mCamera = Util.getCameraInstance(cameraId)
+        mCamera = mPreview.getCamera()
+        mCamera!!.stopPreview()
+
         if (mCamera != null) {
 
             val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -85,80 +93,52 @@ class CameraService : DaggerService() {
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
                     PixelFormat.TRANSLUCENT)
 
-            val sh = mPreview.holder
+            var width = 0
+            var height = 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                val displaySize = Point()
+                wm.getDefaultDisplay().getRealSize(displaySize)
+                width = displaySize.x
+                height = displaySize.y
+            } else {
+                val metrics = context.getResources().getDisplayMetrics()
+                width = metrics.widthPixels
+                height = metrics.heightPixels
+            }
 
             mPreview.setZOrderOnTop(true)
-            sh.setFormat(PixelFormat.TRANSPARENT)
+            // sh.setFormat(PixelFormat.TRANSPARENT)
 
-            sh.addCallback(object : SurfaceHolder.Callback {
-                override fun surfaceCreated(holder: SurfaceHolder) {
-                    val params = mCamera!!.parameters
-                    mCamera!!.parameters = params
-                    val p = mCamera!!.parameters
+            mMediaRecorder = MediaRecorder()
+            // Reason for lock and unlock: https://stackoverflow.com/a/18480619
+            mCamera!!.lock()
+            mCamera!!.unlock()
+            mMediaRecorder!!.setCamera(mCamera)
+//            mMediaRecorder!!.setVideoSize(width, height);
+            mMediaRecorder!!.setAudioSource(MediaRecorder.AudioSource.MIC)
+            mMediaRecorder!!.setVideoSource(MediaRecorder.VideoSource.CAMERA)
 
-                    var listSize: List<Camera.Size>
+            if (cameraId == Camera.CameraInfo.CAMERA_FACING_BACK) {
+                mMediaRecorder!!.setProfile(CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH))
+            } else {
+                mMediaRecorder!!.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_480P))
+            }
 
-                    listSize = p.supportedPreviewSizes
-                    val mPreviewSize = listSize[2]
-                    Log.v(TAG, "preview width = " + mPreviewSize.width
-                            + " preview height = " + mPreviewSize.height)
-                    p.setPreviewSize(mPreviewSize.width, mPreviewSize.height)
+            mRecordingPath = Util.getOutputMediaFile(Util.MEDIA_TYPE_VIDEO)!!.path
+            mMediaRecorder!!.setOutputFile(mRecordingPath)
 
-                    listSize = p.supportedPictureSizes
-                    val mPictureSize = listSize[2]
-                    Log.v(TAG, "capture width = " + mPictureSize.width
-                            + " capture height = " + mPictureSize.height)
-                    p.setPictureSize(mPictureSize.width, mPictureSize.height)
-                    mCamera!!.parameters = p
+            mMediaRecorder!!.setPreviewDisplay(mPreview.holder.surface)
 
-                    try {
-                        mCamera!!.setPreviewDisplay(holder)
-                    } catch (e: IOException) {
-                        e.printStackTrace()
-                    }
+            try {
+                mMediaRecorder!!.prepare()
+            } catch (e: IllegalStateException) {
+                Log.d(TAG, "IllegalStateException when preparing MediaRecorder: " + e.message)
+            } catch (e: IOException) {
+                Log.d(TAG, "IOException when preparing MediaRecorder: " + e.message)
+            }
 
-                    mCamera!!.startPreview()
-
-                    mCamera!!.unlock()
-
-                    mMediaRecorder = MediaRecorder()
-                    mMediaRecorder!!.setCamera(mCamera)
-
-                    mMediaRecorder!!.setAudioSource(MediaRecorder.AudioSource.MIC)
-                    mMediaRecorder!!.setVideoSource(MediaRecorder.VideoSource.CAMERA)
-
-                    if (cameraId == Camera.CameraInfo.CAMERA_FACING_BACK) {
-                        mMediaRecorder!!.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH))
-                    } else {
-                        mMediaRecorder!!.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_480P))
-                    }
-
-                    mRecordingPath = Util.getOutputMediaFile(Util.MEDIA_TYPE_VIDEO)!!.path
-                    mMediaRecorder!!.setOutputFile(mRecordingPath)
-
-                    mMediaRecorder!!.setPreviewDisplay(holder.surface)
-
-                    try {
-                        mMediaRecorder!!.prepare()
-                    } catch (e: IllegalStateException) {
-                        Log.d(TAG, "IllegalStateException when preparing MediaRecorder: " + e.message)
-                    } catch (e: IOException) {
-                        Log.d(TAG, "IOException when preparing MediaRecorder: " + e.message)
-                    }
-
-                    mMediaRecorder!!.start()
-
-                    resultReceiver.send(RECORD_RESULT_OK, null)
-                    Log.d(TAG, "Recording is started")
-                }
-
-                override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
-
-                override fun surfaceDestroyed(holder: SurfaceHolder) {}
-            })
-
-
-            wm.addView(mPreview, params)
+            mMediaRecorder!!.start()
+            // wm.addView(mPreview, params)
 
         } else {
             Log.d(TAG, "Get Camera from service failed")
